@@ -8,7 +8,7 @@ fn main() {
 
 const MANY_COUNTERS: usize = 1000;
 
-type CounterHolder = Vec<(usize, (ReadSignal<i32>, WriteSignal<i32>))>;
+type CounterHolder = Vec<(usize, RwSignal<i32>)>;
 
 #[derive(Copy, Clone)]
 struct CounterUpdater {
@@ -23,17 +23,15 @@ pub fn Counters() -> impl IntoView {
 
     let add_counter = move |_| {
         let id = next_counter_id.get();
-        let sig = create_signal(0);
-        set_counters.update(move |counters| counters.push((id, sig)));
+        set_counters
+            .update(move |counters| counters.push((id, RwSignal::new(0))));
         set_next_counter_id.update(|id| *id += 1);
     };
 
     let add_many_counters = move |_| {
         let next_id = next_counter_id.get();
-        let new_counters = (next_id..next_id + MANY_COUNTERS).map(|id| {
-            let signal = create_signal(0);
-            (id, signal)
-        });
+        let new_counters =
+            (next_id..next_id + MANY_COUNTERS).map(|id| (id, RwSignal::new(0)));
 
         set_counters.update(move |counters| counters.extend(new_counters));
         set_next_counter_id.update(|id| *id += MANY_COUNTERS);
@@ -59,7 +57,7 @@ pub fn Counters() -> impl IntoView {
                 <span data-testid="total">{move ||
                     counters.get()
                         .iter()
-                        .map(|(_, (count, _))| count.get())
+                        .map(|(_, count)| count.get())
                         .sum::<i32>()
                         .to_string()
                 }</span>
@@ -71,7 +69,8 @@ pub fn Counters() -> impl IntoView {
                 <For
                     each={move || counters.get()}
                     key={|counter| counter.0}
-                    view=move |(id, (value, set_value))| {
+                    view=move |(id, signal)| {
+                        let (value, set_value) = signal.split();
                         view! {
                             <Counter id value set_value/>
                         }

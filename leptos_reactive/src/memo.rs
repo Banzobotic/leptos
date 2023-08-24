@@ -165,6 +165,58 @@ where
     pub(crate) defined_at: &'static std::panic::Location<'static>,
 }
 
+impl<T> Memo<T> {
+    /// Creates a new memo from the given function.
+    ///
+    /// This is identical to [`create_memo`].
+    /// /// ```
+    /// # use leptos_reactive::*;
+    /// # fn really_expensive_computation(value: i32) -> i32 { value };
+    /// # let runtime = create_runtime();
+    /// let (value, set_value) = create_signal(0);
+    ///
+    /// // 🆗 we could create a derived signal with a simple function
+    /// let double_value = move || value.get() * 2;
+    /// set_value.set(2);
+    /// assert_eq!(double_value(), 4);
+    ///
+    /// // but imagine the computation is really expensive
+    /// let expensive = move || really_expensive_computation(value.get()); // lazy: doesn't run until called
+    /// create_effect(move |_| {
+    ///   // 🆗 run #1: calls `really_expensive_computation` the first time
+    ///   log::debug!("expensive = {}", expensive());
+    /// });
+    /// create_effect(move |_| {
+    ///   // ❌ run #2: this calls `really_expensive_computation` a second time!
+    ///   let value = expensive();
+    ///   // do something else...
+    /// });
+    ///
+    /// // instead, we create a memo
+    /// // 🆗 run #1: the calculation runs once immediately
+    /// let memoized = Memo::new(move |_| really_expensive_computation(value.get()));
+    /// create_effect(move |_| {
+    ///   // 🆗 reads the current value of the memo
+    ///   //    can be `memoized()` on nightly
+    ///   log::debug!("memoized = {}", memoized.get());
+    /// });
+    /// create_effect(move |_| {
+    ///   // ✅ reads the current value **without re-running the calculation**
+    ///   let value = memoized.get();
+    ///   // do something else...
+    /// });
+    /// # runtime.dispose();
+    /// ```
+    #[inline(always)]
+    #[track_caller]
+    pub fn new(f: impl Fn(Option<&T>) -> T + 'static) -> Memo<T>
+    where
+        T: PartialEq + 'static,
+    {
+        create_memo(f)
+    }
+}
+
 impl<T> Clone for Memo<T>
 where
     T: 'static,
